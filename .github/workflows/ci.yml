@@ -58,4 +58,7 @@ jobs:
         run: bandit -r trustgraph -q
 
       - name: pip-audit (known-vulnerable dependency scan)
+        # Fails on any advisory with a fix available. A finding with no fix
+        # yet gets an explicit `--ignore-vuln <id>` with a re-check date,
+        # not a blanket `|| true`.
         run: pip-audit -r requirements.txt
