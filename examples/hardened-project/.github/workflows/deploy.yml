@@ -1,0 +1,22 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: some-random-org/build-action@8f2e9c1a4b6d7e0f1a2b3c4d5e6f7a8b9c0d1e2f
+      - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/production-deploy-role
+          aws-region: us-east-1
+      - run: ./deploy.sh

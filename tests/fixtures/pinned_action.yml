@@ -1,0 +1,9 @@
+name: pinned_action
+on: push
+permissions: {}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: some-org/some-action@1234567890123456789012345678901234567890

@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+.DS_Store
+build/
+dist/
+
+# Scan output -- ephemeral, and can echo back sensitive resource/role
+# names from a scanned target's resources.json or trust-policies/*.json.
+# See docs/threat-model.md ("Information disclosure").
+.trustgraph/

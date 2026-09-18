@@ -1,0 +1,14 @@
+[
+  {
+    "role": "production-deploy-role",
+    "resource": "prod-customer-data-s3-bucket",
+    "description": "Production S3 bucket holding customer data exports",
+    "permission": "read-write"
+  },
+  {
+    "role": "production-deploy-role",
+    "resource": "prod-rds-database",
+    "description": "Production RDS database (customer PII)",
+    "permission": "network-access"
+  }
+]
