@@ -46,6 +46,14 @@ named cloud resource rather than just flagging the permission in isolation.
 | ⛔ | Live validation of a finding against a real environment -- this is Phase 1: static analysis only, zero credentials, zero API calls, zero side effects. Phase 2 (TrustLab, a disposable local lab that actually attempts a finding end-to-end) is planned but not built yet -- see the roadmap in `docs/architecture.md` |
 | ⛔ | Automatic discovery of which cloud resources a role can reach -- that requires parsing IAM *permission* policies and simulating evaluation, not just trust policies; Phase 1 takes it as a small supplied `resources.json` instead of a simplified (and likely wrong) permission-policy parser |
 
+## Try it with zero local setup (GitHub Codespaces)
+
+This repo has a `.devcontainer/` config. Click **Code → Codespaces → Create
+codespace on main** on GitHub, or open the repo in a devcontainer-compatible
+editor. It automatically creates a venv, installs dependencies, installs the
+package, and runs a first scan against the bundled vulnerable example as a
+smoke test -- no manual steps.
+
 ## Quickstart
 
 ```bash
@@ -61,6 +69,9 @@ trustgraph fix TG-001 --in examples/vulnerable-project
 # Compare against the corrected version -- same shape, hardened
 trustgraph scan examples/hardened-project --repo-name my-org/hardened-project
 ```
+
+Or, equivalently, run `./setup.sh` from the repo root (also what the
+Codespaces devcontainer runs automatically).
 
 `scan` looks for `.github/workflows/*.yml` and `trust-policies/*.json`
 under the target directory, plus an optional `resources.json` mapping IAM
