@@ -6,14 +6,19 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7
         with:
           python-version: "3.11"
           cache: "pip"
@@ -37,10 +42,12 @@ jobs:
   security:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7
         with:
           python-version: "3.11"
 
@@ -51,7 +58,4 @@ jobs:
         run: bandit -r trustgraph -q
 
       - name: pip-audit (known-vulnerable dependency scan)
-        run: pip-audit -r requirements.txt || true
-        # pip-audit is informational here (`|| true`): it can fail CI on
-        # advisories in transitive deps with no fix yet available. Findings
-        # still show up in the job log for review rather than being silenced.
+        run: pip-audit -r requirements.txt
