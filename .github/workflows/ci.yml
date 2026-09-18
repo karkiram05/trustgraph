@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install package (editable, for the console script + package imports)
+        run: pip install -e .
+
+      - name: Run tests
+        run: python -m pytest -v
+
+      - name: Sanity-check the CLI against the example fixtures
+        run: |
+          trustgraph scan examples/vulnerable-project --repo-name my-org/vulnerable-project --json /tmp/vuln.json
+          test "$(python -c "import json; print(len(json.load(open('/tmp/vuln.json'))))")" -gt 0
+          trustgraph scan examples/hardened-project --repo-name my-org/hardened-project | grep -q "No findings"
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install security tooling
+        run: pip install bandit pip-audit
+
+      - name: Bandit (static analysis for common security issues)
+        run: bandit -r trustgraph -q
+
+      - name: pip-audit (known-vulnerable dependency scan)
+        run: pip-audit -r requirements.txt || true
+        # pip-audit is informational here (`|| true`): it can fail CI on
+        # advisories in transitive deps with no fix yet available. Findings
+        # still show up in the job log for review rather than being silenced.
