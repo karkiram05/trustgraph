@@ -96,8 +96,24 @@ def build_graph(
                 "audience_restricted": policy.audience_restricted(),
             }))
 
+    known_role_ids = {n.id for n in graph.nodes(NodeType.IAM_ROLE)}
     for entry in resource_access:
         role_id = f"role:{entry['role']}"
+        if role_id not in known_role_ids:
+            # Adding an edge for a role that was never added as a node would
+            # have networkx silently create a bare, attribute-less node for
+            # it -- later code that reads node "type" (e.g. nodes()) would
+            # then crash with a confusing KeyError far from the real cause.
+            # A resources.json role that doesn't match any trust-policy
+            # filename is virtually always a typo/mismatch, so fail loudly
+            # here instead, naming the actual mismatch.
+            raise ValueError(
+                f"resources.json references role {entry['role']!r}, but no "
+                f"trust-policies/*.json file defines that role (role name "
+                f"is taken from the trust-policy filename, e.g. "
+                f"trust-policies/{entry['role']}.json). Known roles: "
+                f"{sorted(r.removeprefix('role:') for r in known_role_ids) or 'none'}."
+            )
         resource_id = f"resource:{entry['resource']}"
         if resource_id not in {n.id for n in graph.nodes(NodeType.CLOUD_RESOURCE)}:
             graph.add_node(Node(id=resource_id, type=NodeType.CLOUD_RESOURCE, attrs={

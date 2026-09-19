@@ -51,3 +51,22 @@ def test_no_path_when_no_id_token_requested():
     workflow_id = f"workflow:{wf.path}"
     out_types = {e.type.value for e in graph.out_edges(workflow_id)}
     assert "requests_token" not in out_types
+
+
+def test_build_graph_rejects_resource_access_for_unknown_role():
+    """Regression test: a resources.json entry whose "role" doesn't match
+    any trust-policy filename used to get silently added to the graph as a
+    bare, attribute-less node (networkx auto-vivifies edge endpoints), which
+    then crashed nodes()/other readers with a confusing KeyError('type')
+    far away from the actual mistake. It should fail loudly, at the point
+    of the actual mismatch, instead."""
+    wf = parse_workflow(FIXTURES_DIR / "overpermissioned.yml")
+    policy = parse_trust_policy(FIXTURES_DIR / "wildcard_trust.json")
+    resource_access = [{"role": "some-other-role-name", "resource": "prod-bucket", "description": "x"}]
+
+    try:
+        build_graph([wf], [policy], resource_access, repo_name="my-org/repo")
+        raise AssertionError("expected build_graph to reject the unknown role")
+    except ValueError as exc:
+        assert "some-other-role-name" in str(exc)
+        assert "wildcard_trust" in str(exc)  # the one role that *is* known
