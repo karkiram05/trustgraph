@@ -1,5 +1,9 @@
 # TrustGraph
 
+[![CI](https://github.com/karkiram05/trustgraph/actions/workflows/ci.yml/badge.svg)](https://github.com/karkiram05/trustgraph/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+
 Attack-path analysis for CI/CD identity and cloud trust. It reads GitHub
 Actions workflows (and, optionally, AWS IAM trust policies), builds a
 directed graph of who can act as whom and what they can reach, and reports
