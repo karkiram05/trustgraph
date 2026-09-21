@@ -19,6 +19,28 @@ def test_scan_vulnerable_project_reports_findings(tmp_path):
     assert (target / ".trustgraph" / "findings.json").exists()
 
 
+def test_scan_reaches_same_findings_from_permission_policy_alone(tmp_path):
+    # Same example, but delete the hand-typed resources.json first -- if the
+    # permission-policy + known-resources.json auto-derivation actually
+    # works, the CRITICAL findings for the reachable S3 bucket and RDS
+    # instance should still show up, computed rather than asserted.
+    import shutil
+    target = tmp_path / "vulnerable-project-auto"
+    shutil.copytree(EXAMPLES_DIR / "vulnerable-project", target)
+    (target / "resources.json").unlink()
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["scan", str(target), "--repo-name", "my-org/vulnerable-project"])
+    assert result.exit_code == 0
+    assert "CRITICAL" in result.output
+    assert "permission polic" in result.output
+
+    findings = json.loads((target / ".trustgraph" / "findings.json").read_text())
+    critical_paths = [f["path"] for f in findings if f["severity"] == "CRITICAL" and f["path"]]
+    assert any("prod-customer-data-s3-bucket" in "".join(p) for p in critical_paths)
+    assert any("prod-rds-database" in "".join(p) for p in critical_paths)
+
+
 def test_scan_hardened_project_is_clean(tmp_path):
     import shutil
     target = tmp_path / "hardened-project"
@@ -69,3 +91,19 @@ def test_scan_without_scan_first_errors_cleanly(tmp_path):
 
     result = CliRunner().invoke(cli, ["explain", "TG-001", "--in", str(target)])
     assert result.exit_code != 0
+
+
+def test_symlinked_permission_policy_outside_target_is_skipped(tmp_path):
+    import shutil
+    outside = tmp_path / "outside.json"
+    outside.write_text(json.dumps({"Statement": [{"Effect": "Allow", "Action": "*", "Resource": "*"}]}))
+    target = tmp_path / "proj"
+    shutil.copytree(EXAMPLES_DIR / "vulnerable-project", target)
+    (target / "resources.json").unlink()
+    (target / "permission-policies" / "production-deploy-role.json").unlink()
+    (target / "permission-policies" / "production-deploy-role.json").symlink_to(outside)
+
+    result = CliRunner().invoke(cli, ["scan", str(target), "--repo-name", "my-org/vulnerable-project"])
+    assert result.exit_code == 0
+    assert "Skipping" in result.output
+    assert "permission polic" not in result.output

@@ -5,11 +5,11 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 
 Attack-path analysis for CI/CD identity and cloud trust. It reads GitHub
-Actions workflows (and, optionally, AWS IAM trust policies), builds a
-directed graph of who can act as whom and what they can reach, and reports
-concrete attack paths -- not "this permission looks broad" in isolation,
-but "this permission is broad AND reachable from a compromised CI step AND
-leads to this specific cloud resource."
+Actions workflows and, optionally, AWS IAM policies, builds a directed
+graph of who can act as whom and what they can reach, and reports concrete
+attack paths instead of "this permission looks broad" on its own -- it
+says this permission is broad, it's reachable from a compromised CI step,
+and it leads to this specific resource.
 
 ```
 workflow permissions + OIDC federation + IAM trust policy
@@ -23,15 +23,15 @@ workflow permissions + OIDC federation + IAM trust policy
 
 ## Why this exists
 
-The failure mode this targets is specific and well-documented: a GitHub
+The failure mode I'm targeting is specific and well documented: a GitHub
 Actions job requests an OIDC cloud credential (`id-token: write`) while
-also holding broad `GITHUB_TOKEN` permissions, or trusts that OIDC token
-with a wildcard IAM condition, or runs a third-party action pinned to a
-mutable tag instead of a commit SHA -- any one of which turns "a dependency
-got compromised" into "our AWS account got compromised." These are real,
-recurring incident patterns, not hypothetical ones. TrustGraph statically
-finds them and, where the data is available, traces the actual path to a
-named cloud resource rather than just flagging the permission in isolation.
+also holding broad `GITHUB_TOKEN` permissions, or trusts that token with a
+wildcard IAM condition, or runs a third-party action pinned to a mutable
+tag instead of a commit SHA. Any one of those turns "a dependency got
+compromised" into "our AWS account got compromised" -- these are real
+recurring incident patterns, not made-up ones. TrustGraph finds them
+statically and, where the data's there, traces the actual path to a named
+cloud resource instead of just flagging the permission on its own.
 
 ## What's here (and what isn't, on purpose)
 
@@ -39,17 +39,18 @@ named cloud resource rather than just flagging the permission in isolation.
 |---|---|
 | ✅ | GitHub Actions workflow parser (permissions, OIDC requests, pinning of step actions, job-level reusable workflows and `docker://` images) |
 | ✅ | AWS IAM trust policy parser (OIDC federation, audience/subject conditions) |
+| ✅ | AWS IAM permission-policy parser + reachability check against a resource catalog -- Allow/Deny, explicit-deny-wins, wildcard matching on Action and Resource, so a role→resource mapping can be computed instead of hand-typed (identity-based policies only, see `docs/architecture.md`) |
 | ✅ | A real trust graph (networkx) modeling repo → workflow → action / OIDC → role → resource |
 | ✅ | 4 detection rules, each tied to a documented real-world anti-pattern (`docs/detection-rules.md`) |
 | ✅ | Severity that depends on actual graph reachability, not a static per-rule score |
 | ✅ | Full attack-path explanations and concrete remediation (`trustgraph explain`, `trustgraph fix`) |
 | ✅ | Evaluated against **all 188 workflow files of 12 public repositories**, pinned by commit and kept in the repo, with every intermediate table and an independent re-check of each finding (`docs/results.md`) |
 | ✅ | Hardened for scanning repos you don't trust: refuses to write output through symlinks, skips symlinks out of the target, strips terminal escape sequences from output, caps input file size |
-| ✅ | 48 pytest tests across parsers, rules, graph building, the detection engine, the CLI, and hostile-input handling |
+| ✅ | 60 pytest tests across parsers, rules, graph building, the detection engine, the CLI, and hostile-input handling |
 | ✅ | GitHub Actions CI: tests + Bandit + pip-audit |
 | ✅ | Threat model of the tool itself (`docs/threat-model.md`) |
 | ⛔ | Live validation of a finding against a real environment -- this is Phase 1: static analysis only, zero credentials, zero API calls, zero side effects. Phase 2 (TrustLab, a disposable local lab that actually attempts a finding end-to-end) is planned but not built yet -- see the roadmap in `docs/architecture.md` |
-| ⛔ | Automatic discovery of which cloud resources a role can reach -- that requires parsing IAM *permission* policies and simulating evaluation, not just trust policies; Phase 1 takes it as a small supplied `resources.json` instead of a simplified (and likely wrong) permission-policy parser |
+| ⛔ | Folding SCPs / permission boundaries / resource-based policies into the reachability check above -- each is a separate, harder problem; see `docs/architecture.md` |
 
 ## Try it with zero local setup (GitHub Codespaces)
 
@@ -80,8 +81,10 @@ Codespaces devcontainer runs automatically).
 
 `scan` looks for `.github/workflows/*.yml` and `trust-policies/*.json`
 under the target directory, plus an optional `resources.json` mapping IAM
-role names to the cloud resources they can reach. Point it at any repo
-checkout:
+role names to the cloud resources they can reach, and/or
+`permission-policies/*.json` + `known-resources.json` to work that mapping
+out from the role's actual permissions instead of typing it by hand. Point
+it at any repo checkout:
 
 ```bash
 trustgraph scan /path/to/some/repo --repo-name org/repo
@@ -199,7 +202,7 @@ sequencing and the specific gaps each phase closes.
 ## Development
 
 ```bash
-python -m pytest          # 48 tests
+python -m pytest          # 60 tests
 bandit -r trustgraph -q   # static security analysis
 pip-audit -r requirements.txt   # dependency CVE scan (scoped to this project)
 ```

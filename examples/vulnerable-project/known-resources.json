@@ -1,0 +1,17 @@
+[
+  {
+    "arn": "arn:aws:s3:::prod-customer-data",
+    "name": "prod-customer-data-s3-bucket",
+    "description": "Production S3 bucket holding customer data exports"
+  },
+  {
+    "arn": "arn:aws:rds-db:eu-west-1:111122223333:dbuser:cluster-abc123/deploy",
+    "name": "prod-rds-database",
+    "description": "Production RDS database (customer PII)"
+  },
+  {
+    "arn": "arn:aws:s3:::some-unrelated-bucket",
+    "name": "unrelated-bucket",
+    "description": "A bucket this role has no statement covering, to prove the parser doesn't just allow everything"
+  }
+]

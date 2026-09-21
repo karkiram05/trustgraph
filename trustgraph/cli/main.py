@@ -8,8 +8,14 @@ import click
 
 from trustgraph.detections.base import Severity
 from trustgraph.detections.engine import run_detections
-from trustgraph.graph.builder import build_graph, load_resource_access
+from trustgraph.graph.builder import (
+    build_graph,
+    derive_resource_access,
+    load_resource_access,
+    merge_resource_access,
+)
 from trustgraph.parsers.github_actions import parse_workflow
+from trustgraph.parsers.iam_permissions import load_resource_catalog, parse_permission_policy
 from trustgraph.parsers.iam_trust import parse_trust_policy
 
 STATE_DIR = ".trustgraph"
@@ -82,6 +88,13 @@ def _state_dir(target: Path, *, create: bool) -> Path:
     return state
 
 
+def _discover_permission_policies(target: Path) -> list[Path]:
+    pp_dir = target / "permission-policies"
+    if pp_dir.exists():
+        return _only_inside(target, sorted(pp_dir.glob("*.json")))
+    return []
+
+
 @click.group()
 @click.version_option()
 def cli():
@@ -95,8 +108,11 @@ def cli():
               help="Additional trust policy JSON file(s), beyond trust-policies/*.json.")
 @click.option("--resources", type=click.Path(exists=True), default=None,
               help="JSON file mapping roles to the cloud resources they can access.")
+@click.option("--known-resources", type=click.Path(exists=True), default=None,
+              help="JSON inventory of resource ARNs to check permission policies against "
+                   "(default: known-resources.json in TARGET).")
 @click.option("--json", "json_out", type=click.Path(), default=None, help="Write findings as JSON to this path.")
-def scan(target, repo_name, extra_policies, resources, json_out):
+def scan(target, repo_name, extra_policies, resources, known_resources, json_out):
     """Scan TARGET (a repo checkout) for workflow and trust-policy findings."""
     target_path = Path(target)
 
@@ -114,7 +130,18 @@ def scan(target, repo_name, extra_policies, resources, json_out):
         resource_path = Path(resources) if resources else (target_path / "resources.json")
         if not resources and resource_path.exists() and not _inside(target_path, resource_path):
             raise ValueError(f"{resource_path}: symlink pointing outside the scanned directory")
-        resource_access = load_resource_access(resource_path) if resource_path.exists() else []
+        manual_access = load_resource_access(resource_path) if resource_path.exists() else []
+
+        perm_policy_paths = _discover_permission_policies(target_path)
+        catalog_path = Path(known_resources) if known_resources else (target_path / "known-resources.json")
+        if not known_resources and catalog_path.exists() and not _inside(target_path, catalog_path):
+            raise ValueError(f"{catalog_path}: symlink pointing outside the scanned directory")
+        derived_access = []
+        if perm_policy_paths and catalog_path.exists():
+            permission_policies = [parse_permission_policy(p) for p in perm_policy_paths]
+            derived_access = derive_resource_access(permission_policies, load_resource_catalog(catalog_path))
+
+        resource_access = merge_resource_access(manual_access, derived_access)
 
         graph = build_graph(workflows, trust_policies, resource_access, repo_name=repo_name)
     except (ValueError, OSError) as exc:
@@ -132,7 +159,10 @@ def scan(target, repo_name, extra_policies, resources, json_out):
     if json_out:
         Path(json_out).write_text(json.dumps([f.to_dict() for f in findings], indent=2))
 
-    _echo(f"Scanned {len(workflow_paths)} workflow(s), {len(policy_paths)} trust polic{'y' if len(policy_paths)==1 else 'ies'}.\n")
+    summary = f"Scanned {len(workflow_paths)} workflow(s), {len(policy_paths)} trust polic{'y' if len(policy_paths)==1 else 'ies'}"
+    if perm_policy_paths:
+        summary += f", {len(perm_policy_paths)} permission polic{'y' if len(perm_policy_paths)==1 else 'ies'} ({len(derived_access)} resource(s) reachable)"
+    _echo(summary + ".\n")
     if not findings:
         _echo("No findings. ✓")
         return

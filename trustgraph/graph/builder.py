@@ -1,13 +1,15 @@
-"""Builds a TrustGraph from parsed workflows, trust policies, and an
-optional (simple) role -> cloud resource access map.
+"""Builds a TrustGraph from parsed workflows, trust policies, and role ->
+cloud resource access.
 
-The role -> resource mapping isn't discovered automatically in this phase
-(that would require actually parsing IAM permission policies, not just
-trust policies, and simulating policy evaluation -- a hard problem, see
-docs/architecture.md's roadmap) -- it's supplied as a small JSON file
-describing what each role can reach. Everything upstream of that (the CI
-identity chain) *is* derived automatically from the workflow and trust
-policy files.
+Resource access comes from two sources and they can both be in play at
+once: a hand-supplied resources.json (role/resource/permission triples,
+for when you just know the mapping and don't want to write out a full IAM
+policy), and/or auto-derived reachability computed by
+parsers/iam_permissions.py from real permission-policy JSON + a resource
+catalog. Auto-derived entries are tagged source="permission-policy" so a
+reader can tell "the tool worked this out" apart from "someone asserted
+this." See docs/architecture.md for what the permission-policy evaluation
+does and doesn't cover.
 """
 from __future__ import annotations
 
@@ -124,6 +126,7 @@ def build_graph(
             }))
         graph.add_edge(Edge(source=role_id, target=resource_id, type=EdgeType.CAN_ACCESS, attrs={
             "permission": entry.get("permission", "unknown"),
+            "source": entry.get("source", "manual"),
         }))
 
     return graph
@@ -137,3 +140,39 @@ def load_resource_access(path: str | Path) -> list[dict]:
     ):
         raise ValueError(f"{path}: expected a list of {{\"role\": str, \"resource\": str}} objects")
     return data
+
+
+def derive_resource_access(permission_policies: list, catalog: list[dict]) -> list[dict]:
+    """Run each role's permission policy against the resource catalog and
+    return resource_access entries in the same shape build_graph() expects,
+    marked source="permission-policy" so they can be told apart from a
+    hand-typed resources.json entry downstream."""
+    from trustgraph.parsers.iam_permissions import reachable_resources
+
+    derived = []
+    for policy in permission_policies:
+        for hit in reachable_resources(policy, catalog):
+            derived.append({
+                "role": policy.role_name,
+                "resource": hit["resource"],
+                "description": hit["description"],
+                "permission": hit["permission"],
+                "source": "permission-policy",
+            })
+    return derived
+
+
+def merge_resource_access(*lists: list[dict]) -> list[dict]:
+    """Combine resource_access lists, deduping on (role, resource). First
+    occurrence wins -- put hand-supplied entries first if you want a manual
+    override to take precedence over an auto-derived one for the same pair."""
+    seen = set()
+    merged = []
+    for entries in lists:
+        for entry in entries:
+            key = (entry["role"], entry["resource"])
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(entry)
+    return merged

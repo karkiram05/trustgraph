@@ -20,7 +20,7 @@ extra hop.
 
 **Severity:** HIGH by default; CRITICAL if the graph can trace this repo's
 OIDC subject to a trust policy whose role has a known reachable resource
-(via `resources.json`).
+(via `resources.json` or a permission policy plus `known-resources.json`).
 
 **Input required:** workflow YAML only (a trust policy and resource map
 sharpen severity but aren't required to fire).
@@ -39,7 +39,7 @@ wildcard happens to cover -- can assume the role, not just the specific
 deploy workflow the policy was meant for.
 
 **Severity:** HIGH by default; CRITICAL if a resource is reachable from
-that role in `resources.json`.
+that role in `resources.json` or derived from its permission policy.
 
 **Input required:** an IAM trust policy JSON file (`trust-policies/*.json`).
 Does not require workflow YAML to fire, since the misconfiguration is

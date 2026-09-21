@@ -91,16 +91,40 @@ one. Its known limitation: it only tries conventional branch names and the
 Environments in unusual ways may have a role that's actually reachable but
 that this heuristic doesn't surface -- see the roadmap below.
 
+## Role -> resource reachability
+
+There are two ways to tell TrustGraph what an IAM role can reach, and they
+can both be used at once:
+
+1. **`resources.json`** -- just say it: `{"role": ..., "resource": ...,
+   "permission": ...}`. Fast when you already know the mapping and don't
+   want to write out a full policy document.
+2. **`permission-policies/<role>.json` + `known-resources.json`** --
+   `parsers/iam_permissions.py` parses the role's actual identity-based
+   permission policy (Effect/Action/Resource) and checks it against a small
+   inventory of resource ARNs, matching wildcards the way IAM actually
+   does (`fnmatch` against both the action and the resource ARN) and
+   honoring explicit-deny-wins. `examples/vulnerable-project/` ships both a
+   `resources.json` and an equivalent `permission-policies/` +
+   `known-resources.json` pair -- deleting the former and re-scanning
+   produces the identical CRITICAL findings, computed instead of asserted
+   (see `tests/test_cli.py::test_scan_reaches_same_findings_from_permission_policy_alone`).
+
+This is scoped on purpose and the scope matters: it evaluates one role's
+identity-based policy only. It does not fold in service control policies,
+permission boundaries, resource-based policies (an S3 bucket policy or KMS
+key policy can independently block access this evaluation would otherwise
+say is allowed), or session policies. Any of those can change the real
+answer. A finding built on this is "this role's own policy, read
+literally, grants a path here" -- not "this is definitely reachable in the
+live account," which is a strictly harder problem this project doesn't
+attempt to solve. If neither `permission-policies/` nor `resources.json`
+is present, TrustGraph just doesn't model resource reachability for that
+scan and severities stay at their pre-resource-reachability level -- it
+never guesses.
+
 ## What Phase 1 deliberately does not do
 
-- **Doesn't discover the role -> resource mapping automatically.** Knowing
-  that an IAM role can reach a specific S3 bucket or RDS instance requires
-  parsing that role's *permission* policies (not just its trust policy) and
-  simulating policy evaluation against real AWS semantics -- a genuinely
-  hard problem (`iam-policy-simulator`-grade). Phase 1 takes this as a
-  small supplied JSON file (`resources.json`) instead of inventing a
-  simplified, and likely wrong, permission-policy parser. This is the
-  single largest simplification in the current design.
 - **Doesn't know a repo's actual default token permissions.** GitHub Actions'
   default `GITHUB_TOKEN` permissions depend on an org/repo setting that
   isn't visible in the workflow YAML at all. When a workflow specifies no
@@ -131,10 +155,12 @@ that this heuristic doesn't surface -- see the roadmap below.
   (via `kind`) for modeling cluster-adjacent trust paths, a graph
   visualization dashboard (React Flow), and a single `make demo` that ties
   scan -> lab validation -> visualization together.
-- Automatic role -> resource discovery from real IAM permission policies
-  (not just trust policies) is the biggest open gap in Phase 1's model and
-  would need to land before the resource-reachability severity boost could
-  be trusted without a hand-supplied `resources.json`.
+- Folding SCPs, permission boundaries, and resource-based policies into the
+  permission-policy evaluation above, so "reachable per this role's own
+  policy" can become closer to "reachable in the real account." This is a
+  materially harder problem than the identity-based-policy case already
+  built -- each of those is a separate document type with its own merge
+  semantics.
 - Broader OIDC subject-claim heuristics (custom branch naming conventions,
   GitHub Environments beyond the two conventional ones tried today) to
   reduce `roles_reachable_from_repo()`'s false-negative rate.

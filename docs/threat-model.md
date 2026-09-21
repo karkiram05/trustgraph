@@ -15,8 +15,9 @@ whoever invokes the CLI with whatever permissions they already have.
 ## Assets
 
 - The workflow YAML and trust-policy JSON files being scanned (inputs).
-- The `resources.json` role-to-resource mapping, if supplied (input, and
-  potentially sensitive -- it names real cloud resources).
+- The `resources.json` role-to-resource mapping, and the `permission-policies/`
+  and `known-resources.json` files, if supplied (inputs, and potentially
+  sensitive -- they name real roles, permissions and cloud resources).
 - `.trustgraph/findings.json` and `.trustgraph/graph.json` (outputs, which
   echo back everything in the inputs plus TrustGraph's own analysis).
 
@@ -52,7 +53,7 @@ found; there's no tamper-evidence on it and none is claimed.
 
 ## Information disclosure
 
-This is the main real risk surface. `resources.json` and any supplied trust
+This is the main real risk surface. `resources.json`, the permission policies and the resource catalog, and any supplied trust
 policy JSON can describe real infrastructure (role names, resource names,
 which roles reach which resources). `.trustgraph/findings.json` and
 `graph.json` will echo that information back, verbatim, into a directory
