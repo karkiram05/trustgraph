@@ -1,0 +1,30 @@
+{
+  "fetched_at": "2026-10-05T10:56:06+00:00",
+  "repositories": 12,
+  "repositories_with_findings": 6,
+  "workflow_files": 188,
+  "parsed": 188,
+  "jobs": 402,
+  "jobs_permissions_unspecified": 35,
+  "jobs_requesting_id_token": 73,
+  "action_references": 868,
+  "first_party_references": 694,
+  "same_repo_references": 21,
+  "third_party_references": 174,
+  "third_party_pinned": 156,
+  "third_party_unpinned": 18,
+  "findings": 20,
+  "findings_critical": 0,
+  "findings_high": 4,
+  "findings_medium": 16,
+  "findings_low": 0,
+  "parse_errors": 0,
+  "findings_by_rule": {
+    "unpinned-action": 18,
+    "overpermissioned-token": 2
+  },
+  "unpinned_third_party_by_kind": {
+    "docker": 1,
+    "action": 17
+  }
+}

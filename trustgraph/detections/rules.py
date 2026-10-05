@@ -83,17 +83,31 @@ def rule_missing_audience_restriction(trust_policies: list[TrustPolicy]) -> Iter
             yield {"rule_id": "missing-audience-restriction", "policy": policy}
 
 
-def rule_unpinned_action(workflows: list[Workflow]) -> Iterator[dict]:
+def rule_unpinned_action(workflows: list[Workflow], repo_name: str | None = None) -> Iterator[dict]:
+    own_repo = repo_name.lower() if repo_name else None
     for workflow in workflows:
-        elevated = workflow.any_job_requests_id_token()
-        for action in workflow.all_action_uses():
-            if action.pinned:
-                continue
-            if not action.is_third_party:
-                continue
-            yield {
-                "rule_id": "unpinned-action",
-                "workflow": workflow,
-                "action": action,
-                "elevated_context": elevated,
-            }
+        for job in workflow.jobs:
+            # Elevation is per job: each job runs on its own runner with its
+            # own token, so an action in a job without `id-token: write`
+            # can't mint the OIDC credential another job in the same file
+            # requests.
+            elevated = workflow.job_requests_id_token(job)
+            for action in job.action_uses():
+                if action.pinned:
+                    continue
+                if not action.is_third_party:
+                    continue
+                # A reference back into the scanned repo itself (e.g.
+                # `org/repo/.github/workflows/x.yml@main`) is inside the same
+                # trust boundary: anyone who can move that ref can already
+                # edit the calling workflow. Found in the real-world
+                # evaluation (react/react, vercel/next.js); see docs/results.md.
+                if own_repo and action.repository == own_repo:
+                    continue
+                yield {
+                    "rule_id": "unpinned-action",
+                    "workflow": workflow,
+                    "job": job,
+                    "action": action,
+                    "elevated_context": elevated,
+                }

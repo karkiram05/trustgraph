@@ -35,11 +35,17 @@ def suggest_remediation(rule_id: str, raw: dict) -> list[str]:
     if rule_id == "unpinned-action":
         action = raw["action"]
         note = (
-            " This action runs in a workflow that also requests a cloud OIDC "
+            " This action runs in a job that also requests a cloud OIDC "
             "token, so a compromised tag on this action can reach whatever "
             "that token can reach."
             if raw["elevated_context"] else ""
         )
+        if action.kind == "docker":
+            return [
+                f"Pin `{action.uses}:{action.ref}` to an image digest, e.g. "
+                f"`{action.uses}@sha256:<digest>`. A tag can be re-pushed to "
+                f"point at a different image at any time.{note}",
+            ]
         return [
             f"Pin `{action.uses}@{action.ref}` to a full 40-character commit SHA "
             f"instead of a mutable tag/branch, e.g. "
@@ -60,6 +66,11 @@ def suggest_patch(rule_id: str, raw: dict) -> str | None:
         return f"permissions:\n{before}\n\n->\n\npermissions:\n{after}\n  contents: read"
     if rule_id == "unpinned-action":
         action = raw["action"]
+        if action.kind == "docker":
+            return (
+                f"- uses: {action.uses}:{action.ref}\n"
+                f"+ uses: {action.uses}@sha256:<image-digest>"
+            )
         return (
             f"- uses: {action.uses}@{action.ref}\n"
             f"+ uses: {action.uses}@<full-40-char-commit-sha>  # {action.ref}"

@@ -39,6 +39,18 @@ jobs:
           test "$(python -c "import json; print(len(json.load(open('/tmp/vuln.json'))))")" -gt 0
           trustgraph scan examples/hardened-project --repo-name my-org/hardened-project | grep -q "No findings"
 
+      - name: Re-run the real-world evaluation from the committed raw workflows
+        run: python scripts/evaluate_real_workflows.py
+
+      - name: Re-check every finding against the raw YAML without TrustGraph's parser
+        run: python scripts/verify_findings.py
+
+      - name: Fail if committed results drift from a fresh run
+        run: git diff --exit-code -- data/clean data/processed
+
+      - name: Render charts
+        run: python scripts/make_charts.py
+
   security:
     runs-on: ubuntu-latest
     steps:

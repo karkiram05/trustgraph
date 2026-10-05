@@ -70,16 +70,30 @@ Neither of these is unique to TrustGraph -- any SAST-style tool that reads
 config and writes a report has the same shape of risk -- but it's worth
 stating plainly rather than leaving it implicit.
 
+## Scanning a repository you don't trust
+
+The point of a scanner like this is to run it on repositories you didn't
+write (the real-world evaluation scans 12 of them). A hostile repo
+controls every file TrustGraph reads, so the CLI treats the target as
+untrusted (`trustgraph/cli/main.py`, `trustgraph/parsers/_io.py`, tests in
+`tests/test_hardening.py`):
+
+| Threat | Control |
+|---|---|
+| Repo ships `.trustgraph` (or `.trustgraph/findings.json`) as a symlink, so writing scan output overwrites a file elsewhere, e.g. `~/.bashrc` | Output is refused if the state directory or either output file is a symlink |
+| A workflow or trust-policy file is a symlink to a file outside the repo (`/etc/...`, `~/.aws/credentials`), so its contents get parsed and echoed into findings or errors | Inputs whose resolved path is outside the target are skipped with a warning; an auto-discovered `resources.json` outside the target is an error |
+| Action names, step names or job ids containing ANSI escape sequences that rewrite the terminal (hide findings, fake output) | Every line the CLI prints has C0/C1 control characters replaced with `?` |
+| Multi-gigabyte input files | Each input is size-checked before reading (1 MB cap) |
+| Malformed YAML/JSON, or valid YAML of the wrong shape | Parse errors become a one-line error, not a traceback; non-mapping steps are skipped; `resources.json` is schema-checked |
+
 ## Denial of service
 
-`nx.all_simple_paths`-style traversal is used narrowly (bounded reachability
-queries: `descendants`, and small, explicit path constructions built by the
-detection engine itself, not an unbounded all-paths search over the whole
-graph). Graph size scales with the number of workflow files and trust
-policies actually present in the target directory, which in practice is
-small (tens, not millions). There's no adversarial-input DoS surface worth
-hardening against for a local CLI reading files the user already has
-filesystem access to.
+Graph traversal is narrow (`descendants` and short, explicit path
+constructions built by the detection engine, never an all-paths search).
+Graph size scales with the number of input files, each capped at 1 MB.
+`yaml.safe_load` keeps YAML aliases as shared references rather than
+expanding them, and the parser only walks `jobs` and `steps`, so a
+"billion laughs" alias bomb doesn't multiply work here.
 
 ## Elevation of privilege
 

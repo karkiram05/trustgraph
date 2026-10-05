@@ -19,6 +19,12 @@ from trustgraph.parsers.iam_trust import TrustPolicy
 from trustgraph.remediation.suggest import suggest_remediation
 
 
+_KIND_LABEL = {
+    "action": "action",
+    "reusable-workflow": "reusable workflow",
+    "docker": "container image",
+}
+
 def _role_can_access_resources(graph: TrustGraph, role_id: str) -> list[str]:
     return [e.target for e in graph.out_edges(role_id) if e.type.value == "can_access"]
 
@@ -151,9 +157,10 @@ def run_detections(
         ))
 
     # --- Unpinned third-party actions ---
-    for raw in rule_unpinned_action(workflows):
+    for raw in rule_unpinned_action(workflows, repo_name):
         workflow: Workflow = raw["workflow"]
         action = raw["action"]
+        job = raw["job"]
         rid = repo_id_for_workflow(workflow, repo_name)
         elevated = raw["elevated_context"]
         severity = Severity.MEDIUM
@@ -175,10 +182,14 @@ def run_detections(
         findings.append(Finding(
             id=next_id(),
             rule_id="unpinned-action",
-            title=f"Unpinned third-party action: {action.uses}",
+            title=f"Unpinned third-party {_KIND_LABEL[action.kind]}: {action.uses}",
             severity=severity,
             entry_point=f"CI workflow ({workflow.path})",
-            problem=f"`{action.uses}` is referenced by mutable ref `{action.ref}`, not a commit SHA.",
+            problem=(
+                f"`{action.uses}` (job `{job.id}`) is referenced by mutable ref "
+                f"`{action.ref}`, not "
+                + ("an image digest." if action.kind == "docker" else "a commit SHA.")
+            ),
             cloud_trust=(
                 "Whoever controls that ref can change what code runs in this workflow "
                 "at any time, with whatever permissions the job holds."
@@ -192,7 +203,8 @@ def run_detections(
             ),
             remediation=suggest_remediation("unpinned-action", raw),
             path=path,
-            evidence={"uses": action.uses, "ref": action.ref, "elevated_context": elevated},
+            evidence={"uses": action.uses, "ref": action.ref, "elevated_context": elevated,
+                      "job": job.id, "kind": action.kind},
         ))
 
     findings.sort(key=lambda f: f.severity.rank)

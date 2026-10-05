@@ -1,0 +1,13 @@
+repo,commit,workflow_files,parsed,jobs,jobs_permissions_unspecified,jobs_requesting_id_token,action_references,first_party_references,same_repo_references,third_party_references,third_party_pinned,third_party_unpinned,findings,findings_critical,findings_high,findings_medium,findings_low
+actions/checkout,f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a,7,7,12,9,1,22,19,13,3,0,3,3,0,0,3,0
+actions/upload-artifact,043fb46d1a93c77aae656e7c1c64a875d1fc6a0a,7,7,10,3,1,26,26,1,0,0,0,0,0,0,0,0
+pallets/flask,d73fa1cdcbd8b1465c151db8924ba58b1dd14e35,5,5,8,0,1,21,14,0,7,7,0,0,0,0,0,0
+pypa/pip,a7002c9771a6c3f0317a4e6b9fbdcd22e643f7b6,6,6,14,0,1,25,21,0,4,4,0,0,0,0,0,0
+django/django,a461af8ce48762d7ec602260aaff81014ddccbcb,17,17,32,0,0,64,58,0,6,5,1,1,0,0,1,0
+react/react,278794d7dee9cd2a3a2aaf9f0b2a4b8b747d74ee,26,26,73,0,4,203,192,6,11,7,4,4,0,2,2,0
+vercel/next.js,c4608008ea9ffbcacea5e21e33f40481a7a2ef49,29,29,96,22,54,134,112,1,22,22,0,2,0,2,0,0
+sindresorhus/awesome,bc98e517ddca672f55f9857d714fc3ea3c3540b2,1,1,1,1,0,1,1,0,0,0,0,0,0,0,0,0
+fastapi/fastapi,5f9fc5c59a9bb54608aa35376715f3ba9708188e,20,20,31,0,7,95,53,0,42,42,0,0,0,0,0,0
+fastapi/typer,a80f6e5ecd74f32b983cca336a2f3cba98d9853a,16,16,22,0,4,60,36,0,24,24,0,0,0,0,0,0
+EbookFoundation/free-programming-books,2b098c9d463966b71656a9587a9b148533a8996b,7,7,9,0,0,19,13,0,6,0,6,6,0,0,6,0
+hashicorp/terraform-provider-aws,a4396905e19955be9d1b71f062460732f4de9874,47,47,94,0,0,198,149,0,49,45,4,4,0,0,4,0

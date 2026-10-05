@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 
 from trustgraph.graph.model import Edge, EdgeType, Node, NodeType, TrustGraph
+from trustgraph.parsers._io import read_capped
 from trustgraph.parsers.github_actions import Workflow
 from trustgraph.parsers.iam_trust import GITHUB_OIDC_ISSUER, TrustPolicy
 
@@ -67,6 +68,7 @@ def build_graph(
                 "ref": action.ref,
                 "pinned": action.pinned,
                 "step_name": action.step_name,
+                "kind": action.kind,
             }))
 
         if workflow.any_job_requests_id_token():
@@ -128,5 +130,10 @@ def build_graph(
 
 
 def load_resource_access(path: str | Path) -> list[dict]:
-    with open(path) as f:
-        return json.load(f)
+    data = json.loads(read_capped(Path(path)))
+    if not isinstance(data, list) or not all(
+        isinstance(e, dict) and isinstance(e.get("role"), str) and isinstance(e.get("resource"), str)
+        for e in data
+    ):
+        raise ValueError(f"{path}: expected a list of {{\"role\": str, \"resource\": str}} objects")
+    return data

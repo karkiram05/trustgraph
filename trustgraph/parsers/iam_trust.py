@@ -11,6 +11,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from trustgraph.parsers._io import read_capped
+
 GITHUB_OIDC_ISSUER = "token.actions.githubusercontent.com"
 
 
@@ -57,8 +59,9 @@ class TrustPolicy:
 
 def parse_trust_policy(path: str | Path, role_name: str | None = None) -> TrustPolicy:
     path = Path(path)
-    with open(path) as f:
-        doc = json.load(f)
+    doc = json.loads(read_capped(path))
+    if not isinstance(doc, dict):
+        raise ValueError(f"{path}: not a JSON object")
 
     role_name = role_name or path.stem
 

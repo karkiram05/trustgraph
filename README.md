@@ -37,14 +37,15 @@ named cloud resource rather than just flagging the permission in isolation.
 
 | | |
 |---|---|
-| ✅ | GitHub Actions workflow parser (permissions, OIDC requests, action pinning) |
+| ✅ | GitHub Actions workflow parser (permissions, OIDC requests, pinning of step actions, job-level reusable workflows and `docker://` images) |
 | ✅ | AWS IAM trust policy parser (OIDC federation, audience/subject conditions) |
 | ✅ | A real trust graph (networkx) modeling repo → workflow → action / OIDC → role → resource |
 | ✅ | 4 detection rules, each tied to a documented real-world anti-pattern (`docs/detection-rules.md`) |
 | ✅ | Severity that depends on actual graph reachability, not a static per-rule score |
 | ✅ | Full attack-path explanations and concrete remediation (`trustgraph explain`, `trustgraph fix`) |
-| ✅ | Evaluated against real public GitHub Actions workflows, not just hand-built fixtures (`docs/results.md`) |
-| ✅ | 31 pytest tests across parsers, rules, graph building, the detection engine, and the CLI |
+| ✅ | Evaluated against **all 188 workflow files of 12 public repositories**, pinned by commit and kept in the repo, with every intermediate table and an independent re-check of each finding (`docs/results.md`) |
+| ✅ | Hardened for scanning repos you don't trust: refuses to write output through symlinks, skips symlinks out of the target, strips terminal escape sequences from output, caps input file size |
+| ✅ | 48 pytest tests across parsers, rules, graph building, the detection engine, the CLI, and hostile-input handling |
 | ✅ | GitHub Actions CI: tests + Bandit + pip-audit |
 | ✅ | Threat model of the tool itself (`docs/threat-model.md`) |
 | ⛔ | Live validation of a finding against a real environment -- this is Phase 1: static analysis only, zero credentials, zero API calls, zero side effects. Phase 2 (TrustLab, a disposable local lab that actually attempts a finding end-to-end) is planned but not built yet -- see the roadmap in `docs/architecture.md` |
@@ -130,17 +131,46 @@ branch with a pinned audience. Scanning it: `No findings. ✓`
 
 ## Real-world evaluation
 
-Unit tests prove the rules fire correctly on fixtures built to trigger
-them. That's necessary but not sufficient -- so TrustGraph was also run
-against 12 real, live-fetched GitHub Actions workflows from 9 public
-repositories it had never seen, including major projects (Django, Flask,
-pip, React, Next.js) and smaller ones. 11 scanned clean -- independently
-verified, not just accepted at face value, by hand-inspecting each parsed
-workflow's permissions and action references. The 12th
-(`hashicorp/terraform-provider-aws`) produced 3 genuine MEDIUM findings for
-unpinned third-party actions, with a full working `explain` output. Full
-writeup, including what this kind of evaluation can and can't cover, in
-`docs/results.md`.
+TrustGraph was run against every workflow file (188) in 12 public
+repositories, including Django, Flask, pip, React, Next.js, FastAPI and
+terraform-provider-aws, each pinned to a commit and stored in
+`data/raw/real_workflows/`.
+
+- **20 findings in 6 repositories** (4 HIGH, 16 MEDIUM), each confirmed
+  against the raw YAML by a script that doesn't use TrustGraph's parser.
+  They include `tj-actions/changed-files` used by tag, the action whose
+  tags were hijacked in March 2025 (CVE-2025-30066), and two unpinned
+  actions in React's crates.io publish job, which holds an OIDC token.
+- **Of 174 third-party references, 156 are pinned**; FastAPI, Typer,
+  Next.js, Flask and pip pin every one.
+- **The real data found three bugs in TrustGraph**: reusable workflows and
+  container images were never checked, references back into the scanned
+  repo were counted as third-party (7 false positives), and OIDC elevation
+  was judged per workflow instead of per job. All three are fixed and
+  tested.
+
+![Findings by repository](docs/figures/findings_by_repo.png)
+
+Full write-up, including what this evaluation can't cover, in
+[`docs/results.md`](docs/results.md).
+
+## Data
+
+| | Path |
+|---|---|
+| Raw workflows (pinned, checksummed) | `data/raw/real_workflows/` + `manifest.json` |
+| Clean inventories | `data/clean/action_references.csv` (868 `uses:` references), `job_permissions.csv` (402 jobs), `parse_errors.csv` |
+| Results | `data/processed/findings.csv`, `summary_by_repo.csv`, `summary.json` |
+| Charts | `docs/figures/` |
+
+```bash
+python scripts/fetch_real_workflows.py      # re-download the pinned files, verify SHA-256
+python scripts/evaluate_real_workflows.py   # scan and write data/clean/ + data/processed/
+python scripts/verify_findings.py           # re-check every finding without TrustGraph's parser
+python scripts/make_charts.py               # draw docs/figures/
+```
+
+![Trust graph of the vulnerable example](docs/figures/attack_path_example.png)
 
 ## Documentation
 
@@ -169,7 +199,7 @@ sequencing and the specific gaps each phase closes.
 ## Development
 
 ```bash
-python -m pytest          # 31 tests
+python -m pytest          # 48 tests
 bandit -r trustgraph -q   # static security analysis
 pip-audit -r requirements.txt   # dependency CVE scan (scoped to this project)
 ```

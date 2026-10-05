@@ -64,9 +64,19 @@ having one fewer independent guard).
 
 ## TG rule: `unpinned-action`
 
-**What it checks:** any third-party action (`owner/action`, where `owner`
-isn't `actions` or `github`) referenced by a mutable ref -- a tag or branch
-name -- instead of a full 40-character commit SHA.
+**What it checks:** any third-party reference by a mutable ref instead of
+an immutable one. Three kinds of reference are covered:
+
+- a step's `uses: owner/action@ref` (needs a 40-character commit SHA),
+- a job's `uses: owner/repo/.github/workflows/x.yml@ref`, a reusable
+  workflow that runs another repository's whole workflow (commit SHA),
+- `uses: docker://image:tag` (needs an `@sha256:` image digest).
+
+Not third-party, so not flagged: `actions/*` and `github/*`, local
+`./` references, and references back into the scanned repository itself
+(`org/repo/...@main` inside `org/repo`), because whoever can move that ref
+can already edit the calling workflow. That last exclusion came from the
+real-world evaluation, where it removed 7 false positives.
 
 **Why it matters:** whoever controls that ref can change what code runs in
 your CI at any time, with whatever permissions the job holds. This is the
@@ -75,19 +85,23 @@ compromise the action's repo (or its release/tag process), and every
 downstream workflow pulling `@v2` starts running the attacker's code on its
 next run with no changes needed on the victim's side.
 
-**Severity:** MEDIUM if the job doesn't request an OIDC token. HIGH if it
+**Severity:** judged per job, because each job has its own runner and
+token. MEDIUM if the job that runs the reference doesn't request an OIDC
+token (even if another job in the same file does). HIGH if it
 does (the action's code runs with that job's full permission set,
 including the ability to mint the cloud credential). CRITICAL if, in
 addition, a resource is reachable from a role this repo's OIDC subject
 would satisfy.
 
-**Input required:** workflow YAML only. This is the only rule of the four
-whose entire input is a single public file, which is why it's the only one
-validated against real-world data in `docs/results.md` -- trust policies
-and resource maps aren't published alongside a repo's workflows, so there's
-no public corpus to test the other three rules against the way NSL-KDD
-served SentinelFlow. They're covered by unit tests and the hand-crafted
-`examples/vulnerable-project` walkthrough instead.
+**Input required:** workflow YAML only. This rule and
+`overpermissioned-token` are the two whose whole input is public, which is
+why they are the two that fired in the real-world evaluation in
+`docs/results.md`. Trust policies and resource maps aren't published
+alongside a repo's workflows, so `wildcard-oidc-trust`,
+`missing-audience-restriction` and the CRITICAL resource paths are covered
+by unit tests and `examples/vulnerable-project` only.
+
+**Not covered:** images in `jobs.<id>.container` and `services:`.
 
 ## What's intentionally not a rule (yet)
 

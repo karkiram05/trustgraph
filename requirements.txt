@@ -5,3 +5,6 @@ click==8.3.3
 pytest==9.0.3
 bandit==1.8.0
 pip-audit==2.9.0
+
+# Chart rendering for scripts/make_charts.py (docs/figures/)
+matplotlib==3.11.2

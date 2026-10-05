@@ -28,7 +28,9 @@ class NodeType(str, Enum):
 class EdgeType(str, Enum):
     DEFINES = "defines"                # repository -> workflow
     USES_ACTION = "uses_action"        # workflow -> third_party_action
-    REQUESTS_TOKEN = "requests_token"  # workflow -> oidc_provider  # nosec B105 (enum value, not a credential)
+    # workflow -> oidc_provider. Bandit B105 reads "token" as a hardcoded
+    # password; this is an enum value, not a credential.
+    REQUESTS_TOKEN = "requests_token"  # nosec B105
     TRUSTS = "trusts"                  # oidc_provider -> iam_role (per trust policy)
     CAN_ACCESS = "can_access"          # iam_role -> cloud_resource
 
